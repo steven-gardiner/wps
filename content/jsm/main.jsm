@@ -52,7 +52,12 @@ var wps = (function() {
   };
 
   self.expandRange = function(rng) {
-    rng.setEnd(rng.endContainer, rng.endOffset+5);
+    try {
+      rng.setEnd(rng.endContainer, rng.endOffset+1);
+    } catch (ise) {
+      self.log(JSON.stringify(ise));
+      rng.setEndAfter(rng.endContainer);
+    }
     return rng;
   };
 
