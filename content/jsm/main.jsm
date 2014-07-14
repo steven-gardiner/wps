@@ -51,14 +51,43 @@ var wps = (function() {
 
   };
 
-  self.expandRange = function(rng) {
-    try {
-      rng.setEnd(rng.endContainer, rng.endOffset+1);
-    } catch (ise) {
-      self.log(JSON.stringify(ise));
-      rng.setEndAfter(rng.endContainer);
+  self.gobbleLetter = function(rng) {
+    var ec = rng.endContainer;
+    //self.log(JSON.stringify({EXPAND: ec.nodeType, ELEMENT_NODE: ec.ELEMENT_NODE}));
+    switch (ec.nodeType) {   
+      case ec.ELEMENT_NODE: //ELEMENT_NODE 
+        var kid = ec.childNodes[rng.endOffset];
+        rng.setEnd(kid,0);
+        return self.gobbleLetter(rng);
+      default:   
+        try {        
+          rng.setEnd(ec, rng.endOffset+1);
+        } catch (ise) {
+          self.log(JSON.stringify(ise));
+          rng.setEndAfter(ec);
+          return self.gobbleLetter(rng);
+        }
     }
     return rng;
+  };
+
+  self.gobbleWord = function(rng, terminator) {
+    terminator = terminator || /[\s]$/;
+
+    while (rng.toString().match(terminator)) {
+      self.log(JSON.stringify({PRE: rng.toString()}));
+      rng = self.gobbleLetter(rng);
+    }   
+
+    var rng0 = rng.cloneRange();
+    rng = self.gobbleLetter(rng);    
+    while (! rng.toString().match(terminator)) {      
+      rng0 = rng.cloneRange();
+      rng = self.gobbleLetter(rng);        
+      self.log(JSON.stringify({POST: rng.toString()}));
+    }   
+    self.log(JSON.stringify({DONE: rng0.toString(), rng: rng.toString()}));
+    return rng0;
   };
 
   self.addWindow = function(winn) {
@@ -69,23 +98,39 @@ var wps = (function() {
     var gcm = winn.gContextMenu;
 
     var contextMenu = document.querySelector("#contentAreaContextMenu");
-    var menuitem = document.createElement("menuitem");
-    menuitem.setAttribute("label", "Expand Selection");
-    contextMenu.appendChild(menuitem);
-    this.cleaners.push(function() { contextMenu.removeChild(menuitem); });
+    var lmenuitem = document.createElement("menuitem");
+    lmenuitem.setAttribute("label", "Gobble Letter");
+    contextMenu.appendChild(lmenuitem);
+    this.cleaners.push(function() { contextMenu.removeChild(lmenuitem); });
+
+    var wmenuitem = document.createElement("menuitem");
+    wmenuitem.setAttribute("label", "Gobble Word");
+    contextMenu.appendChild(wmenuitem);
+    this.cleaners.push(function() { contextMenu.removeChild(wmenuitem); });
 
     contextMenu.addEventListener("popupshowing", function(event) {
         self.log("CONTEXT");
         self.log(winn.gContextMenu.target.outerHTML);
         self.log(JSON.stringify(Object.keys(winn.gContextMenu)));
     }, false);
-    menuitem.addEventListener("click", function(event) {
+    lmenuitem.addEventListener("click", function(event) {
       self.log("rightwards ho");
 
       var doc = winn.gContextMenu.target.ownerDocument;
       var sln = doc.defaultView.getSelection();
       var rng0 = sln.getRangeAt(0);
-      var rng1 = self.expandRange(rng0);
+      var rng1 = self.gobbleLetter(rng0);
+      sln.removeAllRanges();
+      sln.addRange(rng1);
+        
+    }, false);
+    wmenuitem.addEventListener("click", function(event) {
+      self.log("rightwards ho");
+
+      var doc = winn.gContextMenu.target.ownerDocument;
+      var sln = doc.defaultView.getSelection();
+      var rng0 = sln.getRangeAt(0);
+      var rng1 = self.gobbleWord(rng0);
       sln.removeAllRanges();
       sln.addRange(rng1);
         
