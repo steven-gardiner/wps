@@ -56,8 +56,13 @@ var wps = (function() {
     //self.log(JSON.stringify({EXPAND: ec.nodeType, ELEMENT_NODE: ec.ELEMENT_NODE}));
     switch (ec.nodeType) {   
       case ec.ELEMENT_NODE: //ELEMENT_NODE 
-        var kid = ec.childNodes[rng.endOffset];
-        rng.setEnd(kid,0);
+        self.log("ELT: " + JSON.stringify({endoffset:rng.endOffset,txt:rng.toString(),elt:ec.outerHTML}));
+        if (ec.childNodes.length > rng.endOffset) {
+          var kid = ec.childNodes[rng.endOffset];
+          rng.setEnd(kid,0);
+        } else {
+          rng.setEndAfter(ec);
+        }       
         return self.gobbleLetter(rng);
       default:   
         try {        
@@ -72,6 +77,27 @@ var wps = (function() {
   };
 
   self.gobbleWord = function(rng, terminator) {
+    terminator = terminator || /[\s]/;
+
+    rng = self.gobbleLetter(rng);  
+
+    var rng2 = rng.cloneRange();
+    rng2.selectNodeContents(rng.endContainer);
+    rng2.setStart(rng.endContainer,rng.endOffset);
+
+    var txt = rng2.toString();
+    var tokens = txt.split(terminator);
+    
+    self.log('rng2: ' + JSON.stringify({txt:txt,tokens:tokens,now:rng2.toString()}));
+    if (tokens.length > 1) {
+      rng.setEnd(rng.endContainer,rng.endOffset+tokens[0].length);
+    } else {
+      rng.setEnd(rng.endContainer,rng.endOffset+tokens[0].length);
+      return self.gobbleWord(rng, terminator);
+    }      
+
+    return rng;
+
     terminator = terminator || /[\s]$/;
 
     while (rng.toString().match(terminator)) {
@@ -108,7 +134,7 @@ var wps = (function() {
     contextMenu.appendChild(wmenuitem);
     this.cleaners.push(function() { contextMenu.removeChild(wmenuitem); });
 
-    contextMenu.addEventListener("popupshowing", function(event) {
+    contextMenu.addEventListener("_popupshowing", function(event) {
         self.log("CONTEXT");
         self.log(winn.gContextMenu.target.outerHTML);
         self.log(JSON.stringify(Object.keys(winn.gContextMenu)));
