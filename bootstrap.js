@@ -16,6 +16,8 @@ boot.onOpenWindow = function(aWindow) {
           if (boot.exports.addWindow) {
             boot.exports.addWindow(domWindow);
           }
+          boot.injectModules(domWindow);
+          boot.emit(domWindow.document, "insert-mozilla-ui");    
         } else {
           domWindow.setTimeout(callback, 100);
         }
@@ -36,14 +38,17 @@ function startup(data,reason) {
     let domWindow = windows.getNext().QueryInterface(Ci.nsIDOMWindow);
     var callback = function() {
       if (boot.exports) {
-        boot.exports.addWindow(domWindow);
+        if (boot.exports.addWindow) {
+          boot.exports.addWindow(domWindow);
+        }
+        boot.injectModules(domWindow);
+        boot.emit(domWindow.document, "insert-mozilla-ui");
       } else {
         domWindow.setTimeout(callback, 100);
       }
     };
     callback.call();
   }
-
 
   Services.wm.addListener(boot);
 
@@ -52,8 +57,51 @@ function startup(data,reason) {
     var jsmurl = addon.optionsURL.split(/\//).slice(0,3).concat(["content",
                                                                  "jsm",
                                                                  "main.jsm"]).join('/');
-    Components.utils.import(jsmurl, boot);
+    var jsurl = addon.optionsURL.split(/\//).slice(0,3).concat(["content",
+                                                                "js",
+                                                                "main.js"]).join('/');
 
+    boot.modules = [];
+    boot.windows = [];
+    boot.emit = function(doc, eventType) {
+      var evt = doc.createEvent("CustomEvent");
+      evt.initCustomEvent(eventType, true, false, {});
+      doc.dispatchEvent(evt);           
+    };
+    boot.require = function(module) {
+      boot.modules.push(module);
+    };
+    boot.injectModules = function(window) {
+      boot.modules.forEach(function(module) {
+        boot.inject(module, window);
+      });
+      boot.windows.push(window);
+    };
+    boot.inject = function(module, window, handler) {
+      var modurl = addon.optionsURL.split(/\//).slice(0,3).join("/") + module;
+      if (! handler) { 
+        handler = function(err) { 
+          Services.console.logStringMessage(err);           
+        }; 
+      }
+      try {
+        Services.scriptloader.loadSubScript(modurl, window, "UTF-8");
+      } catch (err) {
+        handler(err);
+      }
+    };
+    boot.cleanup = function() {
+      boot.windows.forEach(function(window) {
+        boot.emit(window.document, "cleanup-mozilla-ui");          
+      });
+    };
+
+    try {
+      Services.scriptloader.loadSubScript(jsurl, boot, "UTF-8");
+    } catch (ee) {
+      Services.console.logStringMessage(ee); 
+    }
+    Components.utils.import(jsmurl, boot);
     if (boot.exports.init) {
       boot.exports.init();
     }
@@ -65,6 +113,7 @@ function shutdown(data, reason) {
   if (boot.exports.cleanup) {
     boot.exports.cleanup();
   }
+  boot.cleanup();
 
   Services.wm.removeListener(boot);
 }
