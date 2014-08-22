@@ -1,2 +1,4 @@
-content         wps      content/
-skin            wps      classic/1.0  skin/
+content      wps content/     
+skin         wps classic/1.0  skin/        
+locale       wps en-US        locale/en-US/
+

@@ -6,13 +6,14 @@ Components.utils.import("resource://gre/modules/AddonManager.jsm");
 var boot = {};
 boot.onOpenWindow = function(aWindow) {
   let domWindow = aWindow.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowInternal || Ci.nsIDOMWindow);  
-  domWindow.onLoad = function listener() {
-    domWindow.removeEventListener("load", domWindow.onLoad, false);
+  boot.onLoad = function listener() {
+    domWindow.removeEventListener("load", boot.onLoad, false);
 
       // If this is a browser window then setup its UI
     if (domWindow.document.documentElement.getAttribute("windowtype") == "navigator:browser") {
       var callback = function() {
         if (boot.modules) {
+          Services.console.logStringMessage("OPENED");
           boot.injectModules(domWindow);
           boot.emit(domWindow.document, "insert-mozilla-ui");    
         } else {
@@ -23,17 +24,20 @@ boot.onOpenWindow = function(aWindow) {
     }
         
   };
-  domWindow.addEventListener("load", domWindow.onLoad, false);
+  domWindow.addEventListener("load", boot.onLoad, false);
 };
 boot.onCloseWindow = function(aWindow) { };
 boot.onWindowTitleChange = function() { };
 
 function startup(data,reason) {
+  Services.console.logStringMessage("STARTUP");
+
   let windows = Services.wm.getEnumerator("navigator:browser");
   while (windows.hasMoreElements()) {
     let domWindow = windows.getNext().QueryInterface(Ci.nsIDOMWindow);
     var callback = function() {
       if (boot.modules) {
+        Services.console.logStringMessage("PREEXISTING");
         boot.injectModules(domWindow);
         boot.emit(domWindow.document, "insert-mozilla-ui");
       } else {
@@ -51,6 +55,8 @@ function startup(data,reason) {
 
     var extname = urlparts[2];
 
+    Services.console.logStringMessage("ADDON: " + JSON.stringify({extname:extname}));
+
     var extprefix = urlparts.slice(0,3);
     var jsurl = extprefix.concat(["content",
                                   "js",
@@ -65,8 +71,10 @@ function startup(data,reason) {
     boot.windows = [];
     boot.emit = function(doc, eventType) {
       var evt = doc.createEvent("CustomEvent");
-      evt.initCustomEvent(eventType, true, false, {});
+      evt.initCustomEvent(eventType, true, false, {extname:extname});
+      Services.console.logStringMessage("EMIT: " + JSON.stringify({type:eventType,extname:extname}));
       doc.dispatchEvent(evt);    
+      Services.console.logStringMessage("EMITTED: " + JSON.stringify({type:eventType,extname:extname}));
     };
     boot.require = function(module) {
       boot.modules.push(module);
@@ -89,6 +97,9 @@ function startup(data,reason) {
     };
     boot.handleStylesheet = function(event,detail) {
       detail = detail || event.detail || (event.originalEvent && event.originalEvent.detail);
+      if (detail.extname && (detail.extname !== extname)) {
+        return true;
+      }
       boot.injectStylesheet(detail.stylesheet);
     };
     boot.injectModules = function(window) {
@@ -128,8 +139,10 @@ function startup(data,reason) {
     } catch (ee) {
       Services.console.logStringMessage(ee); 
     }
+    Services.console.logStringMessage("ADDED");
 
   });
+  Services.console.logStringMessage("STARTED");
 
 }
 

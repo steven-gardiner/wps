@@ -3,6 +3,7 @@ var stemmer = stemmer || null;
 var wps = function(document) {
   var self = {};
 
+
   var privy = {};
 
   self.stem = stemmer || function(word) { return word; };
@@ -253,6 +254,27 @@ var wps = function(document) {
   return self;
 };
 
+wps.ui = {};
+wps.ui.button = new component.buttonComponent({localid:"button"});
+wps.ui.pagewatcher = new component.pagewatcherComponent({localid:"pagewatcher"});
+
+jQuery(document).on("wps-pagewatcher-load", function(event) {
+  console.log("WPSLOAD");
+
+  var doc = (!! event.target.ownerDocument) ? event.target.ownerDocument : event.target;
+  if (doc.wps) { 
+    console.log("NOTFIRST!");
+    return; 
+  }
+  doc.wps = new wps(doc);
+
+  doc.defaultView.setTimeout(function() {
+    console.log("INDEX!");
+    doc.wps.indexDocument();
+  }, 0);
+});
+
+if (false) {
 jQuery(document).find("#appcontent").on("DOMContentLoaded.wps load.wps", function(event) {
   var doc = (!! event.target.ownerDocument) ? event.target.ownerDocument : event.target;
   
@@ -312,6 +334,7 @@ jQuery(document).on('cleanup-mozilla-ui.wps', function(event) {
   console.log("BAR");
 });
 
+}
 
 if (true) {
   jQuery(document).on('wps-index-passage.wps', function(event, detail) {
